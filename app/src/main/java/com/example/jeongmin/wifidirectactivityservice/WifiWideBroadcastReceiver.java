@@ -84,7 +84,8 @@ public class WifiWideBroadcastReceiver extends BroadcastReceiver {
                 // It's a disconnect
             }
         } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
-
+            service.setThisDevice((WifiP2pDevice) intent.getParcelableExtra(
+                    WifiP2pManager.EXTRA_WIFI_P2P_DEVICE));
         }
     }
 }

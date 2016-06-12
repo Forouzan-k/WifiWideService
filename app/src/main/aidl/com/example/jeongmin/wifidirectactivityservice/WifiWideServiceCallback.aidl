@@ -17,6 +17,6 @@ interface WifiWideServiceCallback {
 
     void onDisconnect(int resultCode);
 
-    void onReceivedData(int resultCode, String type, String data);
+    void onReceivedData(in WifiP2pDevice sender, int resultCode, String type, String data);
 }
 

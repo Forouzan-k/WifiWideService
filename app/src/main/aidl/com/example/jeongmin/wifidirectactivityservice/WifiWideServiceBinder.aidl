@@ -13,6 +13,8 @@ interface WifiWideServiceBinder {
 
      boolean unregisterWifiWideServiceCallback(WifiWideServiceCallback callback);
 
+     WifiP2pDevice getThisDevice();
+
      void createGroupAsOwner();
 
      void discoverWifiWidePeers();
@@ -21,7 +23,7 @@ interface WifiWideServiceBinder {
 
      void disconnect();
 
-     boolean transferDataToPeerDevice(in WifiP2pDevice device, String type, String data);
+     boolean transferDataToPeerDevice(in WifiP2pDevice sender, in WifiP2pDevice receiver, String type, String data);
 
-     boolean transferDataToOwnerDevice(String type, String data);
+     boolean transferDataToOwnerDevice(in WifiP2pDevice sender, String type, String data);
 }

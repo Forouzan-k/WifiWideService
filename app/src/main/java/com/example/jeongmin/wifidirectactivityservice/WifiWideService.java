@@ -38,7 +38,7 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
     private WifiWideAddressManager addressManager;
     private List<WifiP2pDevice> deviceList = new ArrayList<WifiP2pDevice>();
     private List<WifiP2pDevice> groupList = new ArrayList<WifiP2pDevice>();
-
+    private WifiP2pDevice myDevice = new WifiP2pDevice();
     private WifiP2pInfo wifiP2pInfo;
     private boolean isWifiP2pEnabled = false;
     private boolean retryChannel = false;
@@ -68,9 +68,9 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
 
-        manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
-        channel = manager.initialize(this, getMainLooper(), null);
         context = getApplicationContext();
+        manager = (WifiP2pManager) context.getSystemService(Context.WIFI_P2P_SERVICE);
+        channel = manager.initialize(this, getMainLooper(), null);
 
         receiver = new WifiWideBroadcastReceiver(manager, channel, this);
         registerReceiver(receiver, intentFilter);
@@ -89,6 +89,9 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         Log.d(WifiWideService.TAG, "Service End");
     }
 
+    public void setThisDevice(WifiP2pDevice device){
+        this.myDevice = device;
+    }
     /**
      * @param isWifiP2pEnabled the isWifiP2pEnabled to set
      */
@@ -104,11 +107,11 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         if (deviceList.size() == 0) {
             Log.d(WifiWideService.TAG, "No devices found");
             doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_DISCOVER_CALLBACK,
-                    null, null, null);
+                    null, null, null, null);
         }else{
             Log.d(WifiWideService.TAG, "Devices found");
             doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_DISCOVER_CALLBACK,
-                    deviceList, null, null);
+                    deviceList, null, null, null);
         }
     }
 
@@ -155,7 +158,7 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
 
                         Log.d(WifiWideService.TAG, "Here Address send");
 
-                        new WifiWideClientThread(context, messageHandler, WifiWideConstants.INIT_OWNER_SOCKET_PORT,
+                        new WifiWideClientThread(context, messageHandler, myDevice, WifiWideConstants.INIT_OWNER_SOCKET_PORT,
                                 info.groupOwnerAddress.getHostAddress(), WifiWideConstants.WIFI_WIDE_ADDRESS_TYPE, null).start();
                     }
                 }
@@ -187,18 +190,18 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                             }
                         }
                         Log.d(WifiWideService.TAG, "address :" + address + ", frnd : " + friends);
-                        transferData(getPortByAddress(address), address, WifiWideConstants.WIFI_WIDE_FRIENDS_TYPE, friends);
+                        transferData(myDevice, getPortByAddress(address), address, WifiWideConstants.WIFI_WIDE_FRIENDS_TYPE, friends);
                     }
                 }
             }
         }
     }
 
-    public boolean transferData(int port, String address, String type, String data){
+    public boolean transferData(WifiP2pDevice sender, int port, String address, String type, String data){
         Log.d(WifiWideService.TAG, "transfer Data");
         if(type == null)
             return false;
-        new WifiWideClientThread(context, messageHandler, port, address, type, data).start();
+        new WifiWideClientThread(context, messageHandler, sender, port, address, type, data).start();
         return true;
     }
 
@@ -236,6 +239,15 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         return port;
     }
 
+    public WifiP2pDevice getWifiP2pDeviceFromData(String data){
+        WifiP2pDevice sender = new WifiP2pDevice();
+        StringTokenizer st = new StringTokenizer(data, "-");
+        if(st.hasMoreTokens()){
+            sender.deviceAddress = st.nextToken();
+        }
+        return sender;
+    }
+
     class MessageHandler extends Handler{
         @Override
         public void handleMessage(Message msg) {
@@ -245,12 +257,13 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                 case WifiWideConstants.RECEIVE_THREAD_STRING_MESSAGE:
                     if (msg.obj != null) {
                         String data = msg.obj.toString();
+                        WifiP2pDevice sender = getWifiP2pDeviceFromData(data);
                         Log.d(WifiWideService.TAG, "receive : string = " + data);
                         doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_TRANSFER_CALLBACK,
-                                null, WifiWideConstants.WIFI_WIDE_STRING_TYPE, data);
+                                null, sender, WifiWideConstants.WIFI_WIDE_STRING_TYPE, data);
                     }else{
                         doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_TRANSFER_CALLBACK,
-                                null, null, null);
+                                null, null, null, null);
                     }
                     break;
                 case WifiWideConstants.RECEIVE_THREAD_FILE_MESSAGE:
@@ -258,10 +271,10 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                         String data = msg.obj.toString();
                         Log.d(WifiWideService.TAG, "receive : file = " + msg.obj.toString());
                         doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_TRANSFER_CALLBACK,
-                                null, WifiWideConstants.WIFI_WIDE_FILE_TYPE, data);
+                                null, null, WifiWideConstants.WIFI_WIDE_FILE_TYPE, data);
                     }else{
                         doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_TRANSFER_CALLBACK,
-                                null, null, null);
+                                null, null, null, null);
                     }
                     break;
                 case WifiWideConstants.RECEIVE_THREAD_ADDRESS_MESSAGE:
@@ -270,13 +283,13 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                         if(addressManager.addPeerAddress(peerAddress)) {
                             sendFriendsAddress();
                             doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_CONNECT_CALLBACK,
-                                    groupList, null, null);
+                                    groupList, null, null, null);
                             Log.d(WifiWideService.TAG, "add : " + peerAddress);
                             Log.d(WifiWideService.TAG, "size : " + addressManager.getPeerAddressListSize());
                         }else{
                             Log.d(WifiWideService.TAG, "connect fail");
                             doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_CONNECT_CALLBACK,
-                                    null, null, null);
+                                    null, null, null, null);
                         }
                     }
                     break;
@@ -287,11 +300,11 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                     Log.d(WifiWideService.TAG, "friends");
                     if(refreshAddressList(msg.obj.toString())){
                         doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_CONNECT_CALLBACK,
-                                groupList, null, null);
+                                groupList, null, null, null);
                     }else{
                         Log.d(WifiWideService.TAG, "connect fail");
                         doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_CONNECT_CALLBACK,
-                                groupList, null, null);
+                                groupList, null, null, null);
                     }
                     break;
                 case WifiWideConstants.SEND_WIFI_WIDE_ADDRESS_MESSAGE:
@@ -350,7 +363,8 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
 
     final RemoteCallbackList<WifiWideServiceCallback> callbackList = new RemoteCallbackList<WifiWideServiceCallback>();
 
-    public void doServiceCallback(int resultCode, String callbackType, List<WifiP2pDevice> list, String type, String data){
+    public void doServiceCallback(int resultCode, String callbackType, List<WifiP2pDevice> list,
+                                  WifiP2pDevice sender, String type, String data){
         int cnt = callbackList.beginBroadcast();
         for(int i = 0; i < cnt; ++i){
             WifiWideServiceCallback callback = callbackList.getBroadcastItem(i);
@@ -369,7 +383,7 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                         callback.onDisconnect(resultCode);
                         break;
                     case WifiWideConstants.WIFI_WIDE_TRANSFER_CALLBACK:
-                        callback.onReceivedData(resultCode, type, data);
+                        callback.onReceivedData(sender, resultCode, type, data);
                         break;
                 }
             }catch (RemoteException e){
@@ -390,20 +404,25 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         }
 
         @Override
+        public WifiP2pDevice getThisDevice() throws RemoteException {
+            return myDevice;
+        }
+
+        @Override
         public void createGroupAsOwner() throws RemoteException {
             manager.createGroup(channel, new WifiP2pManager.ActionListener() {
                 @Override
                 public void onSuccess() {
                     Log.d(WifiWideService.TAG, "create group as Owner");
                     doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_BEOWNER_CALLBACK,
-                            null, null, null);
+                            null, null, null, null);
                 }
 
                 @Override
                 public void onFailure(int reason) {
                     Log.d(WifiWideService.TAG, "create group failed");
                     doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_BEOWNER_CALLBACK,
-                            null, null, null);
+                            null, null, null, null);
                 }
             });
         }
@@ -421,13 +440,13 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                 public void onFailure(int reasonCode) {
                     Log.d(TAG, "Disconnect failed. Reason :" + reasonCode);
                     doServiceCallback(WifiWideConstants.FAIL_CODE, WifiWideConstants.WIFI_WIDE_DISCONNECT_CALLBACK,
-                            null, null, null);
+                            null, null, null, null);
                 }
                 @Override
                 public void onSuccess() {
                     Log.d(TAG, "Disconnect success");
                     doServiceCallback(WifiWideConstants.SUCCESS_CODE, WifiWideConstants.WIFI_WIDE_DISCONNECT_CALLBACK,
-                            null, null, null);
+                            null, null, null, null);
                 }
             });
 
@@ -478,24 +497,26 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         }
 
         @Override
-        public boolean transferDataToOwnerDevice(String type, String data) throws RemoteException {
+        public boolean transferDataToOwnerDevice(WifiP2pDevice sender, String type, String data) throws RemoteException {
             if(!wifiP2pInfo.isGroupOwner)
-                return transferData(WifiWideConstants.INIT_OWNER_SOCKET_PORT, wifiP2pInfo.groupOwnerAddress.getHostAddress(), type, data);
+                return transferData(sender, WifiWideConstants.INIT_OWNER_SOCKET_PORT,
+                        wifiP2pInfo.groupOwnerAddress.getHostAddress(), type, data);
             else
                 return false;
         }
 
         @Override
-        public boolean transferDataToPeerDevice(WifiP2pDevice device, String type, String data) throws RemoteException {
+        public boolean transferDataToPeerDevice(WifiP2pDevice sender, WifiP2pDevice receiver,
+                                                String type, String data) throws RemoteException {
             String address = null;
             for(int i = 0; i < groupList.size(); ++i){
-                if(device.deviceAddress.equals(groupList.get(i).deviceAddress)){
+                if(receiver.deviceAddress.equals(groupList.get(i).deviceAddress)){
                     address = addressManager.getPeerAddress(i);
                     break;
                 }
             }
             for(int i = 0; i < deviceList.size(); ++i){
-                if(device.deviceAddress.equals(deviceList.get(i).deviceAddress)){
+                if(receiver.deviceAddress.equals(deviceList.get(i).deviceAddress)){
                     address = addressManager.getPeerAddress(i);
                     break;
                 }
@@ -503,7 +524,7 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
 
             if(address != null) {
                 int port = getPortByAddress(address);
-                return transferData(port, address, type, data);
+                return transferData(sender, port, address, type, data);
             }else{
                 return false;
             }

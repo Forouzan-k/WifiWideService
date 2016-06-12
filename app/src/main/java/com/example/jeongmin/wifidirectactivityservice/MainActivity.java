@@ -47,6 +47,7 @@ public class MainActivity extends Activity implements View.OnClickListener{
 
     private ListView listView;
     public WifiP2pDevice device;
+    public WifiP2pDevice myDevice;
     public ArrayList<String> values;
     public ArrayAdapter<String> adapter;
     private IntentFilter intentFilter;
@@ -138,8 +139,10 @@ public class MainActivity extends Activity implements View.OnClickListener{
             }
 
             @Override
-            public void onReceivedData(int resultCode, String type, String data) throws RemoteException {
-
+            public void onReceivedData(WifiP2pDevice sender, int resultCode, String type, String data) throws RemoteException {
+                Log.d(WifiWideService.TAG, "sender : " + sender.deviceAddress);
+                Log.d(WifiWideService.TAG, "dataType : " + type);
+                Log.d(WifiWideService.TAG, "data : " + data);
             }
         };
     }
@@ -171,10 +174,10 @@ public class MainActivity extends Activity implements View.OnClickListener{
                     if (mBound) {
                         Log.d(WifiWideService.TAG, "group : " + mGroup.size());
                         for (int i = 0; i < mGroup.size(); ++i) {
-                            wifiWideServiceBinder.transferDataToPeerDevice(mGroup.get(i), WifiWideConstants.WIFI_WIDE_STRING_TYPE,
+                            wifiWideServiceBinder.transferDataToPeerDevice(myDevice, mGroup.get(i), WifiWideConstants.WIFI_WIDE_STRING_TYPE,
                                     "Hello Peer number " + i);
                         }
-                        wifiWideServiceBinder.transferDataToOwnerDevice(WifiWideConstants.WIFI_WIDE_STRING_TYPE, "Hello Owner!");
+                        wifiWideServiceBinder.transferDataToOwnerDevice(myDevice, WifiWideConstants.WIFI_WIDE_STRING_TYPE, "Hello Owner!");
                     }
                     break;
             }
@@ -225,6 +228,8 @@ public class MainActivity extends Activity implements View.OnClickListener{
             try{
                 if(wifiWideServiceBinder.registerWifiWideServiceCallback(wifiWideServiceCallback)){
                     Log.d(WifiWideService.TAG, "callback bind success");
+                    myDevice = wifiWideServiceBinder.getThisDevice();
+                    Log.d(WifiWideService.TAG, "myDevice : " + myDevice.deviceAddress);
                 }else{
                     Log.d(WifiWideService.TAG, "callback bind fail");
                 }

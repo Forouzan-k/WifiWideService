@@ -3,6 +3,7 @@ package com.example.jeongmin.wifidirectactivityservice;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.net.Uri;
+import android.net.wifi.p2p.WifiP2pDevice;
 import android.os.Handler;
 import android.os.Message;
 import android.util.Log;
@@ -22,7 +23,7 @@ public class WifiWideClientThread extends Thread{
 
     private int timeout = 5000;
     private Context context;
-    private Boolean messageHandler = true;
+    private WifiP2pDevice sender;
     private int port;
     private Handler mHandler;
     private String datatype;
@@ -30,9 +31,10 @@ public class WifiWideClientThread extends Thread{
     private String data;
     private Boolean success = false;
 
-    public WifiWideClientThread(Context context, Handler handler, int port, String host, String datatype, String data){
+    public WifiWideClientThread(Context context, Handler handler, WifiP2pDevice sender, int port, String host, String datatype, String data){
         this.context = context;
         this.mHandler = handler;
+        this.sender = sender;
         this.port = port;
         this.host = host;
         this.datatype = datatype;
@@ -77,7 +79,9 @@ public class WifiWideClientThread extends Thread{
                             break;
                         case WifiWideConstants.WIFI_WIDE_STRING_TYPE:
                             message.what = WifiWideConstants.SEND_WIFI_WIDE_STRING_MESSAGE;
+                            Log.d(WifiWideService.TAG, "sender address : " + sender.deviceAddress);
                             message.obj = data;
+                            data = sender.deviceAddress + "-" + data;
                             try {
                                 outputStream.writeUTF(data);
                             } catch (IOException e) {
