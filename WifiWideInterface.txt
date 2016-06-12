@@ -1,0 +1,120 @@
+
+** 기본 서비스 바인드 함수
+     boolean registerWifiWideServiceCallback(WifiWideServiceCallback callback);
+ : callback 등록
+
+     boolean unregisterWifiWideServiceCallback(WifiWideServiceCallback callback);
+ : callback 해제
+
+     WifiP2pDevice getThisDevice();
+ : 함수를 호출한 디바이스의 디바이스 객체를 얻어옴
+
+     void createGroupAsOwner();
+ : 함수를 호출한 디바이스가 채널을 만들고 그룹의 오너가 됨
+
+     void discoverWifiWidePeers();
+ : 디스커버 요청을 하면 콜백으로 결과 리스트를 줌
+
+     void connect(in WifiP2pDevice device);
+ : 인자로 넣은 device 객체가 속한 그룹 채널에 접속함
+ (인자로 넣은 디바이스가 이미 오너이면 본인은 peer가 되며, 해당 디바이스가 오너가 아닐 경우엔,
+ 디바이스끼리의 정책에 따라서 임의로 오너가 결정됨)
+
+     void disconnect();
+ : 현재 속한 그룹 채널에서 연결을 해제함
+
+     boolean transferDataToPeerDevice(in WifiP2pDevice sender, in WifiP2pDevice receiver, String type, String data);
+ : 보내는 디바이스의 디바이스 객체를 넣고, 해당 디바이스 객체에게 특정 타입의 데이터를 보냄
+  (WifiWideConstants.WIFI_WIDE_STRING_TYPE 이랑 WifiWideConstants.WIFI_WIDE_FILE_TYPE이랑 WifiWideConstants.WIFI_WIDE_EXIT_TYPE 세 가지가 있음)
+  (data에는 string일경우엔 그냥 string을, file일 경우엔 file의 절대경로를, exit일 경우엔 아무 데이터도 넣지 않아도 됨)
+
+     boolean transferDataToOwnerDevice(in WifiP2pDevice sender, String type, String data);
+ : 보내는 디바이스의 디바이스 객체를 넣고, 오너 디바이스에게 특정 타입의 데이터를 보냄
+  데이터의 타입과 데이터는 위의 피어 디바이스 메소드와 동일하므로 생략
+
+** 서비스 바인드 콜백 함수
+ - 모든 콜백 함수는 함수 호출의 결과 콜백으로 WifiWideConstants.SUCCESS_CODE나 WifiWideConstants.FAIL_CODE를 반환해줌
+
+    void onCreateGroupAsOwner(int resultCode);
+ : createGroupAsOwner 함수의 결과를 줌
+
+    void onDiscoverWifiWidePeers(int resultCode, in List<WifiP2pDevice> peers);
+ : discover의 결과를 코드로 주고, 성공시에는 peers에 해당 디스커버된 리스트를 줌
+
+    void onConnectChanged(int resultCode, in List<WifiP2pDevice> group);
+ : 연결된 그룹 채널에서 그룹 구성원이 변할때마다 그 결과를 코드와 함께 리스트로 줌
+
+    void onDisconnect(int resultCode);
+ : 연결 해제 시도시 성공여부를 코드로 줌
+
+    void onReceivedData(in WifiP2pDevice sender, int resultCode, String type, String data);
+ : 데이터를 받을 경우에 데이터를 보낸 디바이스의 deviceAddress 변수만 채워진 디바이스 객체와 성공여부와 데이터 타입 그리고 데이터를 줌
+  데이터 타입은 데이터를 보낼때와 동일하게 WifiWideConstants.WIFI_WIDE_STRING_TYPE 이랑 WifiWideConstants.WIFI_WIDE_FILE_TYPE이랑
+  WifiWideConstants.WIFI_WIDE_EXIT_TYPE 세 가지가 있음
+  데이터는 String일 경우엔 string, file일 경우엔 디바이스 내에서 저장된 파일의 절대경로를, exit일 경우엔 null 데이터가 들어옴
+
+** 사용법 예시 리스트뷰의 밸류에 디스커버된 디바이스 이름을 넣고, 리스트뷰 형태로 가지고 있으면서 해당 리스트뷰의 아이템이 선택되면 현재 디바이스를 선택된
+  리스트 아이템으로 대입해서 연결할 디바이스를 선택하게끔 하는 예제
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+		List<WifiP2pDevice> mPeers = new ArrayList<WifiP2pDevice>();
+		ArrayList<String> values = new ArrayList<String>();
+		ArrayAdapter<String> adapter = new ArrayList<String>();	
+        	ListView listView = (ListView) findViewById(R.id.listView);
+	        adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, android.R.id.text1, values);
+	        listView.setAdapter(adapter);
+
+	        // ListView Item Click Listener
+	        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+	
+	            @Override
+	            public void onItemClick(AdapterView<?> parent, View view,
+	                                    int position, long id) {
+	
+       	         // ListView Clicked item index
+       	         int itemPosition     = position;
+       	         // ListView Clicked item value
+       	         String  itemValue    = (String) listView.getItemAtPosition(position);
+       	         // Show Alert
+        	        device = mPeers.get(position);
+        	    }
+	        });
+	    wifiWideServiceCallback = new WifiWideServiceCallback.Stub(){
+
+            @Override
+            public void onCreateGroupAsOwner(int resultCode) throws RemoteException {
+
+            }
+
+            @Override
+            public void onDiscoverWifiWidePeers(int resultCode, List<WifiP2pDevice> peerList) throws RemoteException {
+                if(resultCode == WifiWideConstants.SUCCESS_CODE) {
+                    mPeers = peerList;
+                    Log.d(WifiWideService.TAG, "Receive success");
+                    values.clear();
+                    for (int i = 0; i < mPeers.size(); ++i) {
+                        values.add(mPeers.get(i).deviceName);
+                    }
+                    adapter.notifyDataSetChanged();
+                }else{
+                    Log.d(WifiWideService.TAG, "Receive fail");
+                }
+            }
+
+            @Override
+            public void onConnectChanged(int resultCode, List<WifiP2pDevice> groupMembers) throws RemoteException {
+                mGroup = groupMembers;
+            }
+
+            @Override
+            public void onDisconnect(int resultCode) throws RemoteException {
+
+            }
+
+            @Override
+            public void onReceivedData(WifiP2pDevice sender, int resultCode, String type, String data) throws RemoteException {
+
+            }
+        };
+    }
