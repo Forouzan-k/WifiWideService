@@ -11,9 +11,9 @@ interface WifiWideServiceCallback {
      */
     void onCreateGroupAsOwner(int resultCode);
 
-    void onDiscoverWifiWidePeers(int resultCode, in List<WifiP2pDevice> peers);
+    void onDiscoverWifiWidePeers(int resultCode, in List<WifiP2pDevice> peerList);
 
-    void onConnectChanged(int resultCode, in List<WifiP2pDevice> group);
+    void onConnectChanged(int resultCode, in List<WifiP2pDevice> groupMembers);
 
     void onDisconnect(int resultCode);
 

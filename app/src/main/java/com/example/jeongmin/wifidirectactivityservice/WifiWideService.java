@@ -17,7 +17,6 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
-import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -96,35 +95,6 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
     public void setIsWifiP2pEnabled(boolean isWifiP2pEnabled) {
         this.isWifiP2pEnabled = isWifiP2pEnabled;
         Log.d(WifiWideService.TAG, "WifiP2pEnabled : "+ isWifiP2pEnabled);
-    }
-
-    public boolean setWifiWideEnable(){
-        if (manager != null && channel != null) {
-
-            // Since this is the system wireless settings activity, it's
-            // not going to send us a result. We will be notified by
-            // WiFiDeviceBroadcastReceiver instead.
-
-            startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
-        } else {
-            Log.e(TAG, "channel or manager is null");
-        }
-        return isWifiP2pEnabled;
-    }
-
-    public void setWifiWideDevicePeers(List<WifiP2pDevice> list){
-        this.deviceList = list;
-    }
-
-    public void setWifiWideGroupMembers(List<WifiP2pDevice> list){
-        this.groupList = list;
-    }
-
-    public void sendBroadcast(String action, int code){
-        Intent intent = new Intent();
-        intent.setAction(action);
-        intent.putExtra(action, code);
-        sendBroadcast(intent);
     }
 
     @Override
@@ -487,14 +457,12 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         }
 
         @Override
-        public void discoverWifiWidePeers(List<WifiP2pDevice> mPeers, List<WifiP2pDevice> mGroup) throws RemoteException {
+        public void discoverWifiWidePeers() throws RemoteException {
             Log.d(WifiWideService.TAG, "Discover");
             if (!isWifiP2pEnabled) {
                 Toast.makeText(context, "Set on the Wifi", Toast.LENGTH_SHORT).show();
                 return ;
             }
-            setWifiWideDevicePeers(mPeers);
-            setWifiWideGroupMembers(mGroup);
             manager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
                 @Override
                 public void onSuccess() {

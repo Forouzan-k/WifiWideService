@@ -12,6 +12,7 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
@@ -37,8 +38,8 @@ import java.util.List;
 
 public class MainActivity extends Activity implements View.OnClickListener{
 
-    private ArrayList<WifiP2pDevice> peers;
-    private ArrayList<WifiP2pDevice> group;
+    private List<WifiP2pDevice> mPeers;
+    private List<WifiP2pDevice> mGroup;
     private Boolean mBound = false;
 
     private WifiWideServiceBinder wifiWideServiceBinder = null;
@@ -69,8 +70,8 @@ public class MainActivity extends Activity implements View.OnClickListener{
         btnDisconnet.setOnClickListener(this);
         btnSendFile.setOnClickListener(this);
 
-        peers = new ArrayList<WifiP2pDevice>();
-        group = new ArrayList<WifiP2pDevice>();
+        mPeers = new ArrayList<WifiP2pDevice>();
+        mGroup = new ArrayList<WifiP2pDevice>();
         listView = (ListView) findViewById(R.id.listView);
 
         // Defined Array values to show in ListView
@@ -100,7 +101,7 @@ public class MainActivity extends Activity implements View.OnClickListener{
                 // ListView Clicked item value
                 String  itemValue    = (String) listView.getItemAtPosition(position);
                 // Show Alert
-                device = peers.get(position);
+                device = mPeers.get(position);
             }
         });
 
@@ -112,12 +113,13 @@ public class MainActivity extends Activity implements View.OnClickListener{
             }
 
             @Override
-            public void onDiscoverWifiWidePeers(int resultCode, List<WifiP2pDevice> peers) throws RemoteException {
+            public void onDiscoverWifiWidePeers(int resultCode, List<WifiP2pDevice> peerList) throws RemoteException {
                 if(resultCode == WifiWideConstants.SUCCESS_CODE) {
+                    mPeers = peerList;
                     Log.d(WifiWideService.TAG, "Receive success");
                     values.clear();
-                    for (int i = 0; i < peers.size(); ++i) {
-                        values.add(peers.get(i).deviceName);
+                    for (int i = 0; i < mPeers.size(); ++i) {
+                        values.add(mPeers.get(i).deviceName);
                     }
                     adapter.notifyDataSetChanged();
                 }else{
@@ -126,8 +128,8 @@ public class MainActivity extends Activity implements View.OnClickListener{
             }
 
             @Override
-            public void onConnectChanged(int resultCode, List<WifiP2pDevice> group) throws RemoteException {
-
+            public void onConnectChanged(int resultCode, List<WifiP2pDevice> groupMembers) throws RemoteException {
+                mGroup = groupMembers;
             }
 
             @Override
@@ -151,7 +153,7 @@ public class MainActivity extends Activity implements View.OnClickListener{
                     break;
                 case R.id.btnDiscover:
                     if (mBound)
-                        wifiWideServiceBinder.discoverWifiWidePeers(peers, group);
+                        wifiWideServiceBinder.discoverWifiWidePeers();
                     break;
                 case R.id.btnServiceEnd:
                     resetData();
@@ -167,9 +169,9 @@ public class MainActivity extends Activity implements View.OnClickListener{
                     break;
                 case R.id.btnSendFile:
                     if (mBound) {
-                        Log.d(WifiWideService.TAG, "group : " + group.size());
-                        for (int i = 0; i < group.size(); ++i) {
-                            wifiWideServiceBinder.transferDataToPeerDevice(group.get(i), WifiWideConstants.WIFI_WIDE_STRING_TYPE,
+                        Log.d(WifiWideService.TAG, "group : " + mGroup.size());
+                        for (int i = 0; i < mGroup.size(); ++i) {
+                            wifiWideServiceBinder.transferDataToPeerDevice(mGroup.get(i), WifiWideConstants.WIFI_WIDE_STRING_TYPE,
                                     "Hello Peer number " + i);
                         }
                         wifiWideServiceBinder.transferDataToOwnerDevice(WifiWideConstants.WIFI_WIDE_STRING_TYPE, "Hello Owner!");

@@ -15,7 +15,7 @@ interface WifiWideServiceBinder {
 
      void createGroupAsOwner();
 
-     void discoverWifiWidePeers(in List<WifiP2pDevice> mPeers, in List<WifiP2pDevice> mGroup);
+     void discoverWifiWidePeers();
 
      void connect(in WifiP2pDevice device);
 
