@@ -67,7 +67,7 @@ public class WifiWideClientThread extends Thread{
                     Log.d(WifiWideService.TAG, "send : " + datatype);
                     switch (datatype) {
                         case WifiWideConstants.WIFI_WIDE_ADDRESS_TYPE:
-                            data = socket.getLocalAddress().getHostAddress();
+                            data = sender.deviceAddress + "-" + socket.getLocalAddress().getHostAddress();
                             message.what = WifiWideConstants.SEND_WIFI_WIDE_ADDRESS_MESSAGE;
                             message.obj = socket.getLocalAddress().getHostAddress();
                             Log.d(WifiWideService.TAG, "peer address : " + data);

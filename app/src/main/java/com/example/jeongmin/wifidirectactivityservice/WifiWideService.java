@@ -9,6 +9,7 @@ import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.os.Binder;
@@ -30,7 +31,7 @@ import java.util.StringTokenizer;
  * Created by Jeongmin on 2016-05-21.
  */
 public class WifiWideService extends Service implements WifiP2pManager.ChannelListener,
-        WifiP2pManager.PeerListListener, WifiP2pManager.ConnectionInfoListener{
+        WifiP2pManager.PeerListListener, WifiP2pManager.ConnectionInfoListener, WifiP2pManager.GroupInfoListener{
 
     public static final String TAG = "WifiWideService";
 
@@ -137,6 +138,7 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         // After the group negotiation, we assign the group owner as the file
         // server. The file server is single threaded, single connection server
         // socket.
+        manager.requestGroupInfo(channel, this);
         if (wifiP2pInfo.groupFormed && wifiP2pInfo.isGroupOwner) {
             Log.d(WifiWideService.TAG, "I'm owner");
             if(deviceList.size() != 0) {
@@ -166,31 +168,67 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         }
     }
 
+    @Override
+    public void onGroupInfoAvailable(WifiP2pGroup group) {
+        groupList.clear();
+        groupList.addAll(group.getClientList());
+        for(int i = 0;i < groupList.size(); ++i){
+            Log.d(WifiWideService.TAG, "group member " + i + " : " + groupList.get(i).deviceAddress);
+        }
+        refreshAddress();
+        sendFriendsAddress();
+    }
+
+    public void refreshAddress(){
+        if(addressManager != null){
+            if(addressManager.getPeerAddressListSize() >= 1){
+                for(int i = 0; i < addressManager.getPeerAddressListSize(); ++i){
+                    boolean exist = false;
+                    for(int j = 0; j < groupList.size(); ++j){
+                        if(addressManager.getPeerDeviceAddress(i).equals(groupList.get(j).deviceAddress)){
+                            exist = true;
+                            break;
+                        }
+                    }
+                    if(!exist){
+                        addressManager.deletePeerAddress(i);
+                    }
+                }
+            }
+        }
+    }
+
     public void sendFriendsAddress(){
         if(wifiP2pInfo != null){
             if(wifiP2pInfo.isGroupOwner){
-                groupList.clear();
-                for(int i = 0; i < addressManager.getPeerAddressListSize(); ++i){
-                    WifiP2pDevice device = new WifiP2pDevice();
-                    device.deviceAddress = deviceList.get(i).deviceAddress;
-                    groupList.add(device);
-                }
-                if(addressManager.getPeerAddressListSize() >= 2){
-                    for(int i = 0; i < addressManager.getPeerAddressListSize(); ++i){
-                        String address = addressManager.getPeerAddress(i);
-                        String friends = "";
+                if(groupList.size() >= 1){
+                    for(int i = 0; i < groupList.size(); ++i){
+                        String address = groupList.get(i).deviceAddress;
+                        String ip = null;
                         int count = 0;
-                        for(int j = 0; j < addressManager.getPeerAddressListSize(); ++j){
-                            if(!addressManager.getPeerAddress(j).equals(address)){
-                                friends += deviceList.get(j).deviceAddress + "-" +addressManager.getPeerAddress(j);
-                                count++;
-                                if(count < addressManager.getPeerAddressListSize() - 1){
-                                    friends += ",";
+                        if(addressManager != null){
+                            if(addressManager.getPeerAddressListSize() >= 1){
+                                for(int j = 0; j < addressManager.getPeerAddressListSize(); ++j){
+                                    if(addressManager.getPeerDeviceAddress(j).equals(address)){
+                                        ip = addressManager.getPeerIp(j);
+                                    }
+                                }
+                                if(ip != null){
+                                    String friends = "";
+                                    for(int j = 0; j < addressManager.getPeerAddressListSize(); ++j){
+                                        if(!addressManager.getPeerDeviceAddress(j).equals(address)){
+                                            friends += addressManager.getPeerAddress(j);
+                                            count++;
+                                            if(count < addressManager.getPeerAddressListSize() - 1){
+                                                friends += ",";
+                                            }
+                                        }
+                                    }
+                                    Log.d(WifiWideService.TAG, "address :" + ip + ", frnd : " + friends);
+                                    transferData(myDevice, getPortByAddress(ip), ip, WifiWideConstants.WIFI_WIDE_FRIENDS_TYPE, friends);
                                 }
                             }
                         }
-                        Log.d(WifiWideService.TAG, "address :" + address + ", frnd : " + friends);
-                        transferData(myDevice, getPortByAddress(address), address, WifiWideConstants.WIFI_WIDE_FRIENDS_TYPE, friends);
                     }
                 }
             }
@@ -219,9 +257,6 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
                 WifiP2pDevice device = new WifiP2pDevice();
                 device.deviceAddress = deviceAddress;
                 groupList.add(device);
-            }
-            if(st2.hasMoreTokens()) {
-                peerAddress = st2.nextToken();
             }
             addressManager.addPeerAddress(peerAddress);
         }
@@ -348,17 +383,6 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
     @Override
     public boolean onUnbind(Intent intent) {
         return super.onUnbind(intent);
-    }
-
-    /**
-     * Class used for the client Binder.  Because we know this service always
-     * runs in the same process as its clients, we don't need to deal with IPC.
-     */
-    public class LocalBinder extends Binder {
-        WifiWideService getService() {
-            // Return this instance of LocalService so clients can call public methods
-            return WifiWideService.this;
-        }
     }
 
     final RemoteCallbackList<WifiWideServiceCallback> callbackList = new RemoteCallbackList<WifiWideServiceCallback>();
@@ -509,15 +533,9 @@ public class WifiWideService extends Service implements WifiP2pManager.ChannelLi
         public boolean transferDataToPeerDevice(WifiP2pDevice sender, WifiP2pDevice receiver,
                                                 String type, String data) throws RemoteException {
             String address = null;
-            for(int i = 0; i < groupList.size(); ++i){
-                if(receiver.deviceAddress.equals(groupList.get(i).deviceAddress)){
-                    address = addressManager.getPeerAddress(i);
-                    break;
-                }
-            }
-            for(int i = 0; i < deviceList.size(); ++i){
-                if(receiver.deviceAddress.equals(deviceList.get(i).deviceAddress)){
-                    address = addressManager.getPeerAddress(i);
+            for(int i = 0; i < addressManager.getPeerAddressListSize(); ++i){
+                if(receiver.deviceAddress.equals(addressManager.getPeerDeviceAddress(i))){
+                    address = addressManager.getPeerIp(i);
                     break;
                 }
             }

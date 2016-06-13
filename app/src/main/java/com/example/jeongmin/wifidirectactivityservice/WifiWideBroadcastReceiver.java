@@ -71,7 +71,6 @@ public class WifiWideBroadcastReceiver extends BroadcastReceiver {
             if (manager == null) {
                 return;
             }
-
             NetworkInfo networkInfo = (NetworkInfo) intent
                     .getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
 
@@ -79,6 +78,7 @@ public class WifiWideBroadcastReceiver extends BroadcastReceiver {
 
                 // we are connected with the other device, request connection
                 // info to find group owner IP
+                Log.d(WifiWideService.TAG, "connection changed");
                 manager.requestConnectionInfo(channel, service);
             } else {
                 // It's a disconnect

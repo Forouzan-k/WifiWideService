@@ -53,6 +53,11 @@ public class MainActivity extends Activity implements View.OnClickListener{
     private IntentFilter intentFilter;
     ProgressDialog progressDialog = null;
 
+
+    /*for example
+
+     */
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
